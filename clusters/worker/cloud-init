@@ -1,0 +1,34 @@
+#cloud-config
+
+coreos:
+  etcd2:
+    name: etcdserver
+    initial-cluster: etcdserver=http://$private_ipv4:2380
+    initial-advertise-peer-urls: http://$private_ipv4:2380
+    advertise-client-urls: http://$private_ipv4:2379
+    # listen on both the official ports and the legacy ports
+    # legacy ports can be omitted if your application doesn't depend on them
+    listen-client-urls: http://0.0.0.0:2379,http://0.0.0.0:4001
+    listen-peer-urls: http://$private_ipv4:2380
+  units:
+    - name: etcd2.service
+      command: stop
+    - name: etcd-peers.service
+      command: start
+      content: |
+        [Unit]
+        Description=Write file with etcd peers to bootstrap to
+        [Service]
+        Restart=on-failure
+        RestartSec=10
+        ExecStartPre=/usr/bin/docker pull monsantoco/etcd-aws-cluster:latest
+        ExecStartPre=/usr/bin/docker run -e PROXY_ASG=etcd-core --rm=true -v /etc/sysconfig/:/etc/sysconfig monsantoco/etcd-aws-cluster:latest
+        ExecStart=/usr/bin/systemctl start etcd2
+    - name: fleet.service
+      command: start
+write_files:
+  - path: /etc/systemd/system/etcd2.service.d/30-etcd_peers.conf
+    permissions: 0644
+    content: |
+      [Service]
+      EnvironmentFile=/etc/sysconfig/etcd-peers
