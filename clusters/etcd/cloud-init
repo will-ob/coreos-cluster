@@ -26,6 +26,21 @@ coreos:
         ExecStart=/usr/bin/systemctl start etcd2
     - name: fleet.service
       command: start
+    - name: consul.service
+      command: start
+      content: |
+        [Unit]
+        Description=Join or bootstrap consul cluster
+        After=etcd2.service
+        Requires=etcd2.service
+        After=docker.service
+        Requires=docker.service
+        [Service]
+        Restart=on-failure
+        RestartSec=10
+        ExecStartPre=/usr/bin/wget -O /tmp/bootstrap-consul.sh https://gist.githubusercontent.com/will-ob/2d625ba1ea092be0c129/raw/8df8f2930acace2d72c432a24daf030876223251/bootstrap-cluster.sh
+        ExecStartPre=/bin/chmod +x /tmp/bootstrap-consul.sh
+        ExecStart=/tmp/bootstrap-consul.sh
 write_files:
   - path: /etc/systemd/system/etcd2.service.d/30-etcd_peers.conf
     permissions: 0644

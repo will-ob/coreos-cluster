@@ -26,6 +26,33 @@ coreos:
         ExecStart=/usr/bin/systemctl start etcd2
     - name: fleet.service
       command: start
+    - name: consul.service
+      command: start
+      content: |
+        [Unit]
+        Description=Consul agent that proxies requests to central cluster
+        [Service]
+        Restart=on-failure
+        RestartSec=10
+        ExecStartPre=/usr/bin/docker pull gliderlabs/consul-agent:0.6
+        ExecStart=/usr/bin/docker run --net=host gliderlabs/consul-agent:0.6 -advertise $private_ipv4 -join internal-etcd-core-1884161524.us-east-1.elb.amazonaws.com
+    - name: registrator.service
+      command: start
+      content: |
+        [Unit]
+        Description=Registrator-ing your services with consul
+        After=consul.service
+        Requires=consul.service
+        [Service]
+        Restart=on-failure
+        RestartSec=10
+        ExecStartPre=/usr/bin/docker pull gliderlabs/registrator:latest
+        ExecStart=/bin/bash -c "/usr/bin/docker run -d \
+           --name=registrator \
+           --net=host \
+           --volume=/var/run/docker.sock:/tmp/docker.sock \
+           gliderlabs/registrator:latest \
+             consul://localhost:8500"
 write_files:
   - path: /etc/systemd/system/etcd2.service.d/30-etcd_peers.conf
     permissions: 0644
